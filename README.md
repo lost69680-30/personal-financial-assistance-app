@@ -1,12 +1,12 @@
 # Personal Financial Assistance App
 
-A mobile-first financial assistance app for Ethiopia with a clean starter architecture for:
+A mobile-first financial assistance app for Ethiopia with a starter architecture for:
 
 - React Native + Expo mobile app
 - Node.js + TypeScript API
 - PostgreSQL + Prisma schema
-- JWT auth endpoints
-- dashboard, budget, goal, and assistance flow scaffolding
+- JWT auth + finance routes
+- dashboard, budget, goal, and assistance request support
 
 ## Repository structure
 
@@ -25,12 +25,21 @@ npm --workspace services/api run dev
 npm --workspace apps/mobile start
 ```
 
-## API auth endpoints
+## API auth and finance endpoints
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `GET /api/auth/me`
+- `GET /api/dashboard`
+- `GET /api/transactions`
+- `POST /api/transactions`
+- `GET /api/budgets`
+- `POST /api/budgets`
+- `GET /api/goals`
+- `POST /api/goals`
+- `GET /api/assistance-requests`
+- `POST /api/assistance-requests`
 
 ## Notes
 
-This scaffold is intended for an Ethiopia-focused MVP with ETB-aware UI and mobile-first flows. It includes core domain models for transactions, budgets, goals, and assistance requests to support the next development phase.
+This scaffold is intended for an Ethiopia-focused MVP with ETB-aware UI and a mobile-first workflow. It includes the core transaction, budget, goal, and assistance models required to build the next stage of the product.

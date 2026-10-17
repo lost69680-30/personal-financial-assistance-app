@@ -24,6 +24,15 @@ const assistanceSchema = z.object({
   amount: z.number().optional(),
 });
 
+const transactionSchema = z.object({
+  title: z.string(),
+  category: z.string(),
+  amount: z.number(),
+  direction: z.enum(['income', 'expense']),
+  date: z.string(),
+  accountId: z.string().optional().nullable(),
+});
+
 router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.id;
 
@@ -36,8 +45,12 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res) => 
   ]);
 
   const totalBalance = accounts.reduce((sum, account) => sum + Number(account.balance), 0);
-  const totalIncome = transactions.filter((tx) => tx.direction === 'income').reduce((sum, tx) => sum + Number(tx.amount), 0);
-  const totalExpense = transactions.filter((tx) => tx.direction === 'expense').reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const totalIncome = transactions
+    .filter((tx) => tx.direction === 'income')
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const totalExpense = transactions
+    .filter((tx) => tx.direction === 'expense')
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
   res.json({
     totalBalance,
@@ -52,9 +65,8 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res) => 
 });
 
 router.get('/transactions', requireAuth, async (req: AuthenticatedRequest, res) => {
-  const userId = req.user!.id;
   const transactions = await prisma.transaction.findMany({
-    where: { userId },
+    where: { userId: req.user!.id },
     orderBy: { date: 'desc' },
   });
 
@@ -62,17 +74,20 @@ router.get('/transactions', requireAuth, async (req: AuthenticatedRequest, res) 
 });
 
 router.post('/transactions', requireAuth, async (req: AuthenticatedRequest, res) => {
-  const { title, category, amount, direction, date, accountId } = req.body;
+  const parsed = transactionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: 'Invalid transaction payload', errors: parsed.error.flatten() });
+  }
 
   const transaction = await prisma.transaction.create({
     data: {
       userId: req.user!.id,
-      title,
-      category,
-      amount: Number(amount),
-      direction,
-      date: new Date(date),
-      accountId: accountId ?? null,
+      title: parsed.data.title,
+      category: parsed.data.category,
+      amount: parsed.data.amount,
+      direction: parsed.data.direction,
+      date: new Date(parsed.data.date),
+      accountId: parsed.data.accountId ?? null,
     },
   });
 
