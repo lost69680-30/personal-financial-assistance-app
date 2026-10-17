@@ -57,6 +57,7 @@ router.post('/register', async (req, res) => {
       firstName: firstName ?? null,
       lastName: lastName ?? null,
       preferredLanguage: preferredLanguage ?? 'am',
+      role: 'user',
     },
   });
 
@@ -69,6 +70,7 @@ router.post('/register', async (req, res) => {
       firstName: user.firstName,
       lastName: user.lastName,
       preferredLanguage: user.preferredLanguage,
+      role: user.role,
     },
   });
 });
@@ -111,6 +113,7 @@ router.post('/login', async (req, res) => {
       firstName: user.firstName,
       lastName: user.lastName,
       preferredLanguage: user.preferredLanguage,
+      role: user.role,
     },
   });
 });
@@ -126,7 +129,7 @@ router.get('/me', async (req, res) => {
     const decoded = jwt.verify(token, config.jwtSecret) as { sub: string };
     const user = await prisma.user.findUnique({
       where: { id: decoded.sub },
-      select: { id: true, email: true, phone: true, firstName: true, lastName: true, preferredLanguage: true, createdAt: true },
+      select: { id: true, email: true, phone: true, firstName: true, lastName: true, preferredLanguage: true, role: true, createdAt: true },
     });
 
     if (!user) return res.status(404).json({ message: 'User not found.' });
