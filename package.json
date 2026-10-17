@@ -1,0 +1,19 @@
+{
+  "name": "personal-financial-assistance-app",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/mobile",
+    "services/api"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspaces --include-workspace-root",
+    "dev:mobile": "npm --workspace apps/mobile start",
+    "dev:api": "npm --workspace services/api run dev",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
