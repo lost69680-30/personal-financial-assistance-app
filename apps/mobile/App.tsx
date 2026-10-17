@@ -51,6 +51,13 @@ type GoalItem = {
   deadline?: string | null;
 };
 
+type AssistanceRequest = {
+  id: string;
+  title: string;
+  status: string;
+  reason: string;
+};
+
 type DashboardState = {
   totalBalance: number;
   totalIncome: number;
@@ -58,7 +65,7 @@ type DashboardState = {
   transactions: TransactionItem[];
   budgets: BudgetItem[];
   goals: GoalItem[];
-  assistanceRequests: Array<{ id: string; title: string; status: string; reason: string }>;
+  assistanceRequests: AssistanceRequest[];
 };
 
 const initialLoginState = {
@@ -73,6 +80,24 @@ const initialSignupState = {
   email: '',
   password: '',
   confirmPassword: '',
+};
+
+const initialBudgetForm = {
+  category: '',
+  limit: '',
+  period: 'monthly',
+};
+
+const initialGoalForm = {
+  title: '',
+  target: '',
+  deadline: '',
+};
+
+const initialSupportForm = {
+  title: '',
+  reason: '',
+  amount: '',
 };
 
 const emptyDashboard: DashboardState = {
@@ -91,11 +116,17 @@ export default function App() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [loginForm, setLoginForm] = useState(initialLoginState);
   const [signupForm, setSignupForm] = useState(initialSignupState);
+  const [budgetForm, setBudgetForm] = useState(initialBudgetForm);
+  const [goalForm, setGoalForm] = useState(initialGoalForm);
+  const [supportForm, setSupportForm] = useState(initialSupportForm);
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [dashboard, setDashboard] = useState<DashboardState>(emptyDashboard);
+  const [showBudgetForm, setShowBudgetForm] = useState(false);
+  const [showGoalForm, setShowGoalForm] = useState(false);
+  const [showSupportForm, setShowSupportForm] = useState(false);
 
   const isLogin = mode === 'login';
 
@@ -110,13 +141,116 @@ export default function App() {
       });
 
       const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Unable to load dashboard.');
-      }
-
+      if (!response.ok) throw new Error(data.message || 'Unable to load dashboard.');
       setDashboard(data);
     } catch (error) {
       Alert.alert('Dashboard error', error instanceof Error ? error.message : 'Unable to load dashboard.');
+    }
+  };
+
+  const fetchWithAuth = async <TData = any>(path: string, method: 'GET' | 'POST' = 'GET', body?: any): Promise<TData> => {
+    if (!token) {
+      throw new Error('Missing authentication token.');
+    }
+
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Request failed.');
+    }
+
+    return data;
+  };
+
+  const handleCreateBudget = async () => {
+    if (!budgetForm.category || !budgetForm.limit) {
+      Alert.alert('Missing information', 'Category and monthly limit are required.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const data = await fetchWithAuth('/api/budgets', 'POST', {
+        category: budgetForm.category,
+        limit: Number(budgetForm.limit),
+        period: budgetForm.period,
+      });
+
+      setDashboard((prev) => ({
+        ...prev,
+        budgets: [...(prev.budgets || []), data.budget],
+      }));
+      setBudgetForm(initialBudgetForm);
+      setShowBudgetForm(false);
+      Alert.alert('Budget added', 'Your new budget has been saved.');
+    } catch (error) {
+      Alert.alert('Budget error', error instanceof Error ? error.message : 'Unable to save budget.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateGoal = async () => {
+    if (!goalForm.title || !goalForm.target) {
+      Alert.alert('Missing information', 'Goal title and target amount are required.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const data = await fetchWithAuth('/api/goals', 'POST', {
+        title: goalForm.title,
+        target: Number(goalForm.target),
+        deadline: goalForm.deadline || null,
+      });
+
+      setDashboard((prev) => ({
+        ...prev,
+        goals: [...(prev.goals || []), data.goal],
+      }));
+      setGoalForm(initialGoalForm);
+      setShowGoalForm(false);
+      Alert.alert('Goal created', 'Your saving goal has been saved.');
+    } catch (error) {
+      Alert.alert('Goal error', error instanceof Error ? error.message : 'Unable to save goal.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateSupportRequest = async () => {
+    if (!supportForm.title || !supportForm.reason) {
+      Alert.alert('Missing information', 'A title and reason are required.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const data = await fetchWithAuth('/api/assistance-requests', 'POST', {
+        title: supportForm.title,
+        reason: supportForm.reason,
+        amount: supportForm.amount ? Number(supportForm.amount) : undefined,
+      });
+
+      setDashboard((prev) => ({
+        ...prev,
+        assistanceRequests: [data.request, ...(prev.assistanceRequests || [])],
+      }));
+      setSupportForm(initialSupportForm);
+      setShowSupportForm(false);
+      Alert.alert('Support request sent', 'Your request has been submitted.');
+    } catch (error) {
+      Alert.alert('Support request error', error instanceof Error ? error.message : 'Unable to submit request.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -260,6 +394,40 @@ export default function App() {
   const renderBudgets = () => (
     <View>
       <Text style={styles.sectionTitle}>Budgets</Text>
+      {showBudgetForm && (
+        <View style={styles.formCard}>
+          <Text style={styles.fieldLabel}>Category</Text>
+          <TextInput
+            style={styles.input}
+            value={budgetForm.category}
+            onChangeText={(text) => setBudgetForm((prev) => ({ ...prev, category: text }))}
+            placeholder="Food, transport..."
+          />
+          <Text style={styles.fieldLabel}>Monthly limit</Text>
+          <TextInput
+            style={styles.input}
+            value={budgetForm.limit}
+            onChangeText={(text) => setBudgetForm((prev) => ({ ...prev, limit: text }))}
+            keyboardType="numeric"
+            placeholder="2500"
+          />
+          <Text style={styles.fieldLabel}>Period</Text>
+          <TextInput
+            style={styles.input}
+            value={budgetForm.period}
+            onChangeText={(text) => setBudgetForm((prev) => ({ ...prev, period: text }))}
+            placeholder="monthly"
+          />
+          <Pressable style={styles.primaryButton} onPress={handleCreateBudget} disabled={isLoading}>
+            <Text style={styles.primaryButtonText}>{isLoading ? 'Saving...' : 'Save budget'}</Text>
+          </Pressable>
+        </View>
+      )}
+
+      <Pressable style={styles.secondaryButton} onPress={() => setShowBudgetForm((prev) => !prev)}>
+        <Text style={styles.secondaryButtonText}>{showBudgetForm ? 'Hide form' : 'Add budget'}</Text>
+      </Pressable>
+
       {(dashboard.budgets || []).length === 0 ? (
         <Text style={styles.emptyText}>No budgets created yet.</Text>
       ) : (
@@ -282,6 +450,40 @@ export default function App() {
   const renderGoals = () => (
     <View>
       <Text style={styles.sectionTitle}>Goals</Text>
+      {showGoalForm && (
+        <View style={styles.formCard}>
+          <Text style={styles.fieldLabel}>Goal title</Text>
+          <TextInput
+            style={styles.input}
+            value={goalForm.title}
+            onChangeText={(text) => setGoalForm((prev) => ({ ...prev, title: text }))}
+            placeholder="Emergency fund"
+          />
+          <Text style={styles.fieldLabel}>Target amount</Text>
+          <TextInput
+            style={styles.input}
+            value={goalForm.target}
+            onChangeText={(text) => setGoalForm((prev) => ({ ...prev, target: text }))}
+            keyboardType="numeric"
+            placeholder="30000"
+          />
+          <Text style={styles.fieldLabel}>Deadline (optional)</Text>
+          <TextInput
+            style={styles.input}
+            value={goalForm.deadline}
+            onChangeText={(text) => setGoalForm((prev) => ({ ...prev, deadline: text }))}
+            placeholder="Dec 2026"
+          />
+          <Pressable style={styles.primaryButton} onPress={handleCreateGoal} disabled={isLoading}>
+            <Text style={styles.primaryButtonText}>{isLoading ? 'Saving...' : 'Save goal'}</Text>
+          </Pressable>
+        </View>
+      )}
+
+      <Pressable style={styles.secondaryButton} onPress={() => setShowGoalForm((prev) => !prev)}>
+        <Text style={styles.secondaryButtonText}>{showGoalForm ? 'Hide form' : 'Add goal'}</Text>
+      </Pressable>
+
       {(dashboard.goals || []).length === 0 ? (
         <Text style={styles.emptyText}>No savings goals yet.</Text>
       ) : (
@@ -304,13 +506,45 @@ export default function App() {
   const renderSupport = () => (
     <View>
       <Text style={styles.sectionTitle}>Support</Text>
+      {showSupportForm && (
+        <View style={styles.formCard}>
+          <Text style={styles.fieldLabel}>Request title</Text>
+          <TextInput
+            style={styles.input}
+            value={supportForm.title}
+            onChangeText={(text) => setSupportForm((prev) => ({ ...prev, title: text }))}
+            placeholder="Short-term assistance"
+          />
+          <Text style={styles.fieldLabel}>Reason</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={supportForm.reason}
+            onChangeText={(text) => setSupportForm((prev) => ({ ...prev, reason: text }))}
+            multiline
+            placeholder="Please explain your situation..."
+          />
+          <Text style={styles.fieldLabel}>Optional amount</Text>
+          <TextInput
+            style={styles.input}
+            value={supportForm.amount}
+            onChangeText={(text) => setSupportForm((prev) => ({ ...prev, amount: text }))}
+            keyboardType="numeric"
+            placeholder="1500"
+          />
+          <Pressable style={styles.primaryButton} onPress={handleCreateSupportRequest} disabled={isLoading}>
+            <Text style={styles.primaryButtonText}>{isLoading ? 'Sending...' : 'Submit request'}</Text>
+          </Pressable>
+        </View>
+      )}
+
+      <Pressable style={styles.secondaryButton} onPress={() => setShowSupportForm((prev) => !prev)}>
+        <Text style={styles.secondaryButtonText}>{showSupportForm ? 'Hide form' : 'New request'}</Text>
+      </Pressable>
+
       {(dashboard.assistanceRequests || []).length === 0 ? (
         <View style={styles.supportBox}>
           <Text style={styles.supportTitle}>Short-term assistance</Text>
           <Text style={styles.supportText}>You have not submitted any support requests yet.</Text>
-          <Pressable style={styles.primaryButton} onPress={() => Alert.alert('Support request', 'This flow is ready for backend submission.') }>
-            <Text style={styles.primaryButtonText}>Submit request</Text>
-          </Pressable>
         </View>
       ) : (
         (dashboard.assistanceRequests || []).map((request) => (
@@ -467,8 +701,11 @@ const styles = StyleSheet.create({
   formCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 12, shadowOffset: { width: 0, height: 2 }, elevation: 2, marginBottom: 20 },
   fieldLabel: { color: '#344054', fontWeight: '600', marginBottom: 8, fontSize: 14 },
   input: { borderWidth: 1, borderColor: '#D0D5DD', backgroundColor: '#F9FAFB', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 16, color: '#101828', fontSize: 15 },
+  textArea: { minHeight: 90, textAlignVertical: 'top' },
   primaryButton: { backgroundColor: '#2D6CFF', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
   primaryButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
+  secondaryButton: { backgroundColor: '#EAF4FF', borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginBottom: 16 },
+  secondaryButtonText: { color: '#1D4ED8', fontWeight: '700' },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
   greeting: { fontSize: 28, fontWeight: '800', color: '#101828' },
   subGreeting: { marginTop: 4, color: '#475467', fontSize: 14 },
@@ -499,3 +736,139 @@ const styles = StyleSheet.create({
   supportText: { color: '#475467', fontSize: 14, lineHeight: 22, marginBottom: 14 },
   emptyText: { color: '#667085', fontSize: 14 },
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
